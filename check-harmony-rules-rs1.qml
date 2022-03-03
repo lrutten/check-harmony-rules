@@ -35,7 +35,58 @@ MuseScore
    menuPath: "Plugins.Chords.Check Primary Chords"
    description: "Check primary chords I, IV and V."
    version: "0.9.0.0"
-    
+ 
+   property variant sop_e: 0
+   property variant alt_e: 1
+   property variant ten_e: 2
+   property variant bas_e: 3
+
+   property var v: {
+      SOP: 0;
+      ALT: 1;
+      TEN: 2;
+      BAS: 3;
+      /*
+      properties:  {
+         0: {name: "SOP"},
+         1: {name: "ALT"},
+         2: {name: "TEN"},
+         3: {name: "BAS"}
+      }
+       */
+   }
+
+   function v_to_s(vo)
+   {
+      //return v.properties[vo].name;
+
+      /*
+      if (vo === v.SOP) return "SOP";
+      if (vo === v.ALT) return "ALT";
+      if (vo === v.TEN) return "TEN";
+      if (vo === v.BAS) return "BAS";
+      return "XXX";
+       */
+      /*
+      switch (vo)
+      {
+         case v.SOP: return "SOP";
+         case v.ALT: return "ALT";
+         case v.TEN: return "TEN";
+         case v.BAS: return "BAS";
+         default:    return "XXX";
+      }
+        */
+      switch (vo)
+      {
+         case sop_e: return "SOP";
+         case alt_e: return "ALT";
+         case ten_e: return "TEN";
+         case bas_e: return "BAS";
+         default:    return "XXX";
+      }
+   }
+
    function show_elementtype(tp)
    {
       switch (tp)
@@ -448,12 +499,13 @@ MuseScore
       this.ppitch = ppi;    // original pitch
       this.bpitch = ppi%12; // pitch in 0-11 range
       this.voice  = voi;    // voice SOP, ALT or TEN
-      this.step   = 1;      // 1, 3 or 5
+      this.step   = 0;      // 1, 3 or 5
 
-      console.log("new note_t " + voi);
+      console.log("new note_t " + ppi + " " + v_to_s(voi));
 
       this.show = function(base) {
-         console.log("      note_t v" + this.voice + " " + this.ppitch + " " + pitch_to_s(this.bpitch) + " base " + (this.ppitch-base));
+         console.log("      note_t v" + v_to_s(this.voice) + " " + this.ppitch + " " + pitch_to_s(this.bpitch) + " base " + (this.ppitch-base) +
+         " step " + this.step);
       }
    }
 
@@ -461,9 +513,9 @@ MuseScore
    function triad_t(co)
    {
       this.notes = [];
-      this.notes[0] = new note_t(co.notes[0].ppitch, "SOP");
-      this.notes[1] = new note_t(co.notes[1].ppitch, "ALT");
-      this.notes[2] = new note_t(co.notes[2].ppitch, "TEN");
+      this.notes[0] = new note_t(co.notes[0].ppitch, sop_e);
+      this.notes[1] = new note_t(co.notes[1].ppitch, alt_e);
+      this.notes[2] = new note_t(co.notes[2].ppitch, ten_e);
 
       this.show = function() {
          console.log("   triad_t");
@@ -485,23 +537,26 @@ MuseScore
       }
 
       this.sort_on_ppitch = function() {
+         console.log("sort_on_ppitch");
          var cont = true;
          while (cont)
          {
             cont = false;
-            if (this.notes[0].ppitch < this.notes[1].pitch)
+            if (this.notes[0].ppitch < this.notes[1].ppitch)
             {
                var tmp = this.notes[0];
                this.notes[0] = this.notes[1];
                this.notes[1] = tmp;
                cont = true;
+               console.log("switch 0-1");
             }
-            if (this.notes[1].ppitch < this.notes[2].pitch)
+            if (this.notes[1].ppitch < this.notes[2].ppitch)
             {
                var tmp = this.notes[1];
                this.notes[1] = this.notes[2];
                this.notes[2] = tmp;
                cont = true;
+               console.log("switch 1-2");
             }
          }
       }
@@ -511,11 +566,11 @@ MuseScore
          {
             this.notes[1].ppitch -= 12;
          }
-         while (this.notes[0].ppitch-12 > this.notes[1].ppitch)
+         while (this.notes[0].ppitch-12 > this.notes[2].ppitch)
          {
             this.notes[0].ppitch -= 12;
          }
-         //this.sort_on_ppitch();
+         this.sort_on_ppitch();
       }
 
       this.is_major_triad = function() {
@@ -528,17 +583,9 @@ MuseScore
             this.notes[0].step = 5;
             this.notes[1].step = 3;
             this.notes[2].step = 1;
-            console.log("is major triad narrow");
+            console.log("is major triad");
 
-            return true;
-         }
-         else
-         if (hig-low == 16 && mid-low == 7)
-         {
-            this.notes[0].step = 3;
-            this.notes[1].step = 5;
-            this.notes[2].step = 1;
-            console.log("is major triad wide");
+            this.is_wide();
 
             return true;
          }
@@ -548,43 +595,47 @@ MuseScore
          }
       }
 
-      /*
-      this.wide_or_narrow = function() {
+
+      this.is_wide = function() {
+         console.log("wide_or_narrow");
+
          // collect all the steps
          var voic = {};
          voic[this.notes[0].voice] = this.notes[0].step;
          voic[this.notes[1].voice] = this.notes[1].step;
          voic[this.notes[2].voice] = this.notes[2].step;
 
-         console.log("sop step " + voic["SOP"]);
-         console.log("alt step " + voic["ALT"]);
-         console.log("ten step " + voic["TEN"]);
+         console.log("   sop step " + voic[sop_e]);
+         console.log("   alt step " + voic[alt_e]);
+         console.log("   ten step " + voic[ten_e]);
 
-         if (voic["SOP"] == 3 && voic["ALT"] == 1 || 
-             voic["SOP"] == 1 && voic["ALT"] == 5 || 
-             voic["SOP"] == 5 && voic["ALT"] == 3)
+         if (voic[sop_e] == 3 && voic[alt_e] == 1 || 
+             voic[sop_e] == 1 && voic[alt_e] == 5 || 
+             voic[sop_e] == 5 && voic[alt_e] == 3)
          {
-            console.log("narrow");
+            console.log("   narrow");
+            return false;
          }
          else
          {
-            console.log("wide");
+            console.log("   wide");
+            return true;
          }
       }
-       */
    }
 
    // class chord_t
    function chord_t()
    {
       this.notes = [];
+      this.wide  = false;
 
       this.add = function(not) {
          this.notes.push(not);
       }
 
       this.show = function() {
-         console.log("   chord");
+         console.log("   chord w " + this.wide);
 
          for (var i=0; i<this.notes.length; i++)
          {
@@ -1096,9 +1147,9 @@ MuseScore
                triad.rotate();
                triad.show();
 
-               console.log("after normalize");
-               triad.normalize();
-               triad.show();
+               //console.log("after normalize");
+               //triad.normalize();
+               //triad.show();
 
                matriad = triad.is_major_triad();
                if (!matriad)
@@ -1107,9 +1158,9 @@ MuseScore
                   triad.rotate();
                   triad.show();
 
-                  console.log("after normalize2");
-                  triad.normalize();
-                  triad.show();
+                  //console.log("after normalize2");
+                  //triad.normalize();
+                  //triad.show();
 
                   matriad = triad.is_major_triad();
 
@@ -1117,12 +1168,17 @@ MuseScore
                   {
                      return false;
                   }
-                  //triad.wide_or_narrow();
                }
-               //triad.wide_or_narrow();
             }
-            //triad.wide_or_narrow();
+
+            if (matriad)
+            {
+               var wi = triad.is_wide();
+               console.log("   wi " + wi);
+               this.chords[i].wide = wi;
+            }
          }
+
 
          return true;
       }
@@ -1186,6 +1242,7 @@ MuseScore
                console.log("each chord should have exact 3 different notes");
                Qt.quit();
             }
+            sco.show_notes();
          }
       }
       else
