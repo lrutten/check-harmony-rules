@@ -19,6 +19,7 @@
 //  - Jon Ensminger (AddNoteNameNoteHeads v. 1.2 plugin)
 //  Thank you :-)
 // 
+//  Further adapted and extended by Leo Rutten 
 //=============================================================================
 
 //import QtQuick 2.3
@@ -26,16 +27,19 @@
 //import QtQuick.Dialogs 1.2
 //import QtQuick.Layouts 1.1
 //import QtQuick.Controls.Styles 1.3
-import MuseScore 1.0
-import QtQuick 2.0
+import QtQuick 2.2
+import QtQuick.Dialogs 1.1
+import MuseScore 3.0
 
 
 MuseScore
 {
-   menuPath: "Plugins.Chords.Check Primary Chords"
-   description: "Check primary chords I, IV and V."
+   menuPath: "Plugins.Harmony.Check primary chord harmony"
+   description: "Check primary chords I, IV, V and VI\nCheck harmony rules"
    version: "0.9.0.0"
  
+   // ---- check chords ----
+
    property variant sop_e: 0
    property variant alt_e: 1
    property variant ten_e: 2
@@ -55,6 +59,564 @@ MuseScore
       }
        */
    }
+
+   // ---- check intervals ----
+   
+   // colors taken from harmonyRules plugin
+   property var colorFifth: "#e21c48";
+   property var colorOctave: "#ff6a07";
+   property var colorLargeInt: "#7b0e7f";
+   property var colorError: "#ff6a64";
+
+   property bool processAll: false;
+   property bool errorChords: false;
+
+
+
+   MessageDialog
+   {
+      id: msgError
+      title: "Error"
+      text: "This score does not contain 4 voices."
+      
+      onAccepted:
+      {
+         Qt.quit();
+      }
+
+      visible: false;
+   }
+
+   MessageDialog
+   {
+      id: msgNoErrors
+      title: "No errors"
+      text: "No errors hav been found."
+      
+      onAccepted:
+      {
+         Qt.quit();
+      }
+
+      visible: false;
+   }
+
+
+   function sgn(x)
+   {
+      if (x > 0) return(1);
+      else if (x == 0) return(0);
+      else return(-1);
+   }
+
+   function isBetween(note1,note2,n)
+   {
+      // test if pitch of note n is between note1 and note2
+      if (note1.pitch > note2.pitch)
+      {
+         if (n.pitch < note1.pitch && n.pitch > note2.pitch)
+            return true;
+      } 
+      else 
+      {
+         if (n.pitch < note2.pitch && n.pitch > note1.pitch)
+            return true;
+      }
+      return false;
+   }      
+
+   function markColor(note1, note2, color) 
+   {
+      note1.color = color;
+      note2.color = color;
+   }
+
+   function markColorNote(note, color) 
+   {
+      note.color = color;
+   }
+
+      function markText(note1, note2, msg, color, trck, tick) 
+   {
+      markColor(note1, note2, color);
+      var myText = newElement(Element.STAFF_TEXT);
+      myText.text = msg;
+      //myText.pos.x = 0;
+      myText.offsetY = 1;
+      
+      var cursor = curScore.newCursor();
+      cursor.rewind(0);
+      cursor.track = trck;
+      while (cursor.tick < tick) 
+      {
+         cursor.next();
+      }
+      cursor.add(myText);
+   }      
+
+   function markTextTick(msg, tick) 
+   {
+      console.log("text " + msg);
+      
+      var myText = newElement(Element.STAFF_TEXT);
+      myText.text = msg;
+      //myText.pos.x = 0;
+      myText.offsetY = 1;
+      
+      var cursor = curScore.newCursor();
+      cursor.rewind(0);
+      cursor.track = 0;  // use track 0
+      while (cursor.tick < tick) 
+      {
+         cursor.next();
+      }
+      cursor.add(myText);
+   }      
+
+   function isAugmentedInt(note1, note2) 
+   {
+      var dtpc = note2.tpc - note1.tpc;
+      var dpitch = note2.pitch - note1.pitch;
+
+      // augmented intervals have same sgn for dtpc and dpitch
+      if (sgn(dtpc) != sgn(dpitch))
+         return false;
+
+      dtpc = Math.abs(dtpc);
+      dpitch = Math.abs(dpitch) % 12;
+
+      // augmented intervalls have tpc diff > 5
+      if (dtpc < 6)
+         return false;
+      if (dtpc == 7 && dpitch == 1) // aug. Unison / Octave
+         return true;
+      if (dtpc == 9 && dpitch == 3) // aug. Second / Ninth
+         return true;
+      if (dtpc == 11 && dpitch == 5) // aug. Third / ...
+         return true;
+      if (dtpc == 6 && dpitch == 6) // aug. Fourth
+         return true;
+      if (dtpc == 8 && dpitch == 8) // aug. Fifth
+         return true;
+      if (dtpc == 10 && dpitch == 10) // aug. Sixth
+         return true;
+      if (dtpc == 12 && dpitch == 0) // aug. Seventh
+         return true;
+      
+      // not augmented
+      return false;
+   }
+
+   function checkDim47(note1, note2, track, tick) 
+   {
+      var dtpc = note2.tpc - note1.tpc;
+      var dpitch = note2.pitch - note1.pitch;
+
+      // diminished intervals have opposite sgn for dtpc and dpitch
+      if (sgn(dtpc) == sgn(dpitch)) 
+      {
+         return;
+      }
+
+      dtpc = Math.abs(dtpc);
+      dpitch = Math.abs(dpitch) % 12;
+
+      if (dtpc == 8 && dpitch == 4) 
+      { // dim. Fourth
+         markText(note1, note2, "dim. 4th, avoid for now",
+            colorError,track,tick);
+      } 
+      else
+      if (dtpc == 9 && dpitch == 9) 
+      { // dim. Seventh
+         markText(note1, note2, "dim. 7th, avoid for now",
+            colorError,track,tick);
+      }
+   }
+
+   function checkDim5(note1, note2, note3, track, tick) 
+   {
+      var dtpc = note2.tpc - note1.tpc;
+      var dpitch = note2.pitch - note1.pitch;
+
+      // diminished intervals have opposite sgn for dtpc and dpitch
+      if (sgn(dtpc) == sgn(dpitch)) 
+      {
+         return;
+      }
+
+      dtpc = Math.abs(dtpc);
+      dpitch = Math.abs(dpitch) % 12;
+
+      if (dtpc == 6 && dpitch == 6) 
+      {
+         // check if note3 is inbetween
+         if (!isBetween(note1,note2,note3)) 
+         {
+            note3.color = colorError;
+            markText(note1,note2,
+            "dim. 5th should be followed by\nnote within interval",
+               colorError,track,tick);
+         }
+      }
+   }
+
+   function check6NextNote(note1, note2, note3, track, tick) 
+   {
+      var dtpc = note2.tpc - note1.tpc;
+      var dpitch = note2.pitch - note1.pitch;
+      var sameSgn = (sgn(dtpc) == sgn(dpitch));
+      dtpc = Math.abs(dtpc);
+      dpitch = Math.abs(dpitch) % 12;
+   
+      // check dim6th, min. 6th or maj. 6th
+      if ((dtpc == 11 && dpitch == 7 && !sameSgn)
+       || (dtpc == 4 && dpitch == 8 && !sameSgn)
+       || (dtpc == 3 && dpitch == 9 && sameSgn)) 
+      {
+         // check if note3 is inbetween
+         if (!isBetween(note1,note2,note3)) 
+         {
+            note3.color = colorError;
+            markText(note1,note2,
+            "6th better avoided, but should be followed by\nnote within interval",
+               colorError,track,tick);
+         } 
+         else
+         {
+            markText(note1,note2,
+            "6th better avoided",
+               colorError,track,tick);
+         }
+      }
+   }
+
+   function check7AndLarger(note1, note2, track, tick, flag) 
+   {
+      var dtpc = Math.abs(note2.tpc - note1.tpc);
+      var dpitch = Math.abs(note2.pitch - note1.pitch);
+      
+      if (dpitch > 9 && dpitch != 12 && dtpc < 6) 
+      {
+         if (flag) 
+         {
+            markText(note1,note2,
+            "No 7ths, 9ths or larger\nnor with 1 note in between",
+            colorLargeInt,track,tick);
+         } 
+         else
+         {
+            markText(note1, note2,
+            "No 7ths, 9ths or larger",colorLargeInt,track,tick);
+         }
+      }
+   }
+
+   function isOctave(note1, note2) 
+   {
+      var dtpc = Math.abs(note2.tpc - note1.tpc);
+      var dpitch = Math.abs(note2.pitch - note1.pitch);
+      if (dpitch == 12 && dtpc == 0)
+         return true;
+      else
+         return false;
+   }
+
+   function check8(note1, note2, note3, track, tick) 
+   {
+      // check if note2 and note3 form an octave
+      // and note1 is not inbetween
+      if (isOctave(note2,note3) && !isBetween(note2,note3,note1)) 
+      {
+         note3.color = colorError;
+         markText(note1,note2,
+            "Octave should be preceeded by note within compass",
+            colorError,track,tick);
+      }
+      // check if note1 and note2 form an octave
+      // and note3 is not inbetween
+      if (isOctave(note1,note2) && !isBetween(note1,note2,note3))
+      {
+         note3.color = colorError;
+         markText(note1,note2,
+            "Octave should be followed by note within compass",
+            colorError,track,tick);
+      }
+   }        
+
+   function onRunIntervals()
+   {
+      console.log("start")
+      if (typeof curScore == 'undefined' || curScore == null) 
+      {
+         console.log("no score found");
+         Qt.quit();
+      }
+
+      // find selection
+      var startStaff;
+      var endStaff;
+      var endTick;
+
+      var cursor = curScore.newCursor();
+      cursor.rewind(1);
+      if (!cursor.segment) 
+      {
+         // no selection
+         console.log("no selection: processing whole score");
+         processAll = true;
+         startStaff = 0;
+         endStaff = curScore.nstaves;
+      } 
+      else
+      {
+         startStaff = cursor.staffIdx;
+         cursor.rewind(2);
+         endStaff = cursor.staffIdx+1;
+         endTick = cursor.tick;
+         if(endTick == 0) 
+         {
+            // selection includes end of score
+            // calculate tick from last score segment
+            endTick = curScore.lastSegment.tick + 1;
+         }
+         cursor.rewind(1);
+         console.log("Selection is: Staves("+startStaff+"-"+endStaff+") Ticks("+cursor.tick+"-"+endTick+")");
+      }   
+
+      // initialize data structure
+
+      var changed = [];
+      var curNote = [];
+      var prevNote = [];
+      var curRest = [];
+      var prevRest = [];
+      var curTick = [];
+      var prevTick = [];
+
+      var foundParallels = 0;
+
+      var track;
+
+      var startTrack = startStaff * 4;
+      var endTrack = endStaff * 4;
+
+      for (track = startTrack; track < endTrack; track++) 
+      {
+         curRest[track] = true;
+         prevRest[track] = true;
+         changed[track] = false;
+         curNote[track] = 0;
+         prevNote[track] = 0;
+         curTick[track] = 0;
+         prevTick[track] = 0;
+      }
+
+      // go through all staves/voices simultaneously
+
+      if(processAll) 
+      {
+         cursor.track = 0;
+         cursor.rewind(0);
+      } 
+      else
+      {
+         cursor.rewind(1);
+      }
+
+      var segment = cursor.segment;
+
+      while (segment && (processAll || segment.tick < endTick)) 
+      {
+         // Pass 1: read notes
+         for (track = startTrack; track < endTrack; track++) 
+         {
+            if (segment.elementAt(track)) 
+            {
+               if (segment.elementAt(track).type == Element.CHORD) 
+               {
+                  // we ignore grace notes for now
+                  var notes = segment.elementAt(track).notes;
+
+                  if (notes.length > 1) 
+                  {
+                     console.log("found chord with more than one note!");
+                     errorChords = true;
+                  }
+
+                  var note = notes[notes.length-1];
+
+                  // check for some voice rules
+                  // if we have a new pitch
+                  if ((! curRest[track]) 
+                       && curNote[track].pitch != note.pitch) 
+                       {
+                     // previous note present
+                     // check for augmented interval
+                     if (isAugmentedInt(note, curNote[track])) 
+                     {
+                        markText(curNote[track],note,
+                        "augmented interval",colorError,
+                        track,curTick[track]);
+                     }
+                     // check for diminished 4th and 7th
+                     checkDim47(curNote[track], note,
+                        track,curTick[track]);
+                     check7AndLarger(curNote[track],note,
+                        track,curTick[track],false);
+
+                     // have three notes?
+                     if (! prevRest[track]) 
+                     {
+                        // check for diminished 5th
+                        checkDim5(prevNote[track],curNote[track],
+                          note, track, prevTick[track]);
+                        // check for 6th
+                        check6NextNote(prevNote[track],curNote[track],
+                          note, track, prevTick[track]);
+                        if(!isOctave(prevNote[track],curNote[track]) &&
+                           !isOctave(curNote[track],note))
+                           check7AndLarger(prevNote[track],note,
+                             track,prevTick[track],true);
+                        check8(prevNote[track],curNote[track],note,
+                           track, prevTick[track]);
+                     }
+                  }
+
+                  // remember note
+
+                  if (curNote[track].pitch != note.pitch) 
+                  {
+                     prevTick[track]=curTick[track];
+                     prevRest[track]=curRest[track];
+                     prevNote[track]=curNote[track];
+                     changed[track]=true;
+                  } 
+                  else
+                  {
+                     changed[track]=false;
+                  }
+                  curRest[track]=false;
+                  curNote[track]=note;
+                  curTick[track]=segment.tick;
+               }
+               else
+               if (segment.elementAt(track).type == Element.REST)
+               {
+                  if (!curRest[track]) 
+                  {
+                     // was note
+                     prevRest[track]=curRest[track];
+                     prevNote[track]=curNote[track];
+                     curRest[track]=true;
+                     changed[track]=false; // no need to check against a rest
+                  }
+               }
+               else
+               {
+                  changed[track] = false;
+               }
+            } 
+            else
+            {
+               changed[track] = false;
+            }
+         }
+         // Pass 2: find paralleles
+         for (track=startTrack; track < endTrack; track++)
+         {
+            var i;
+            // compare to other tracks
+            if (changed[track] && (!prevRest[track]))
+            {
+               var dir1 = sgn(curNote[track].pitch - prevNote[track].pitch);
+               if (dir1 == 0) continue; // voice didn't move
+               for (i=track+1; i < endTrack; i++)
+               {
+                  if (changed[i] && (!prevRest[i]))
+                  {
+                     var dir2 = sgn(curNote[i].pitch-prevNote[i].pitch);
+                     if (dir1 == dir2) 
+                     { // both voices moving in the same direction
+                        var cint = curNote[track].pitch - curNote[i].pitch;
+                        var pint = prevNote[track].pitch-prevNote[i].pitch;
+                        // test for 5th
+                        if (Math.abs(cint%12) == 7) 
+                        {
+                           // test for open parallel
+                           if (cint == pint) 
+                           {
+                              foundParallels++;
+                              console.log ("P5:"+cint+", "+pint);
+                              markText(prevNote[track],prevNote[i],"parallel 5th",
+                                 colorFifth,track,prevTick[track]);
+                              markColor(curNote[track],curNote[i],colorFifth);
+                           } 
+                           else
+                           if (dir1 == 1 && Math.abs(pint) < Math.abs(cint))
+                           {
+                              // hidden parallel (only when moving up)
+                              foundParallels++;
+                              console.log ("H5:"+cint+", "+pint);
+                              markText(prevNote[track],prevNote[i],"hidden 5th",
+                                 colorFifth,track,prevTick[track]);
+                              markColor(curNote[track],curNote[i],colorFifth);
+                           }                        
+                        }
+                        // test for 8th
+                        if (Math.abs(cint%12) == 0) 
+                        {
+                           // test for open parallel
+                           if (cint == pint) 
+                           {
+                              foundParallels++;
+                              console.log ("P8:"+cint+", "+pint+"Tracks "+track+","+i+" Tick="+segment.tick);
+                              markText(prevNote[track],prevNote[i],"parallel 8th",
+                                 colorOctave,track,prevTick[track]);
+                              markColor(curNote[track],curNote[i],colorOctave);
+                           } 
+                           else 
+                           if (dir1 == 1 && Math.abs(pint) < Math.abs(cint)) 
+                           {
+                              // hidden parallel (only when moving up)
+                              foundParallels++;
+                              console.log ("H8:"+cint+", "+pint);
+                              markText(prevNote[track],prevNote[i],"hidden 8th",
+                                 colorOctave,track,prevTick[track]);
+                              markColor(curNote[track],curNote[i],colorOctave);
+                           }                        
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         segment = segment.next;
+      }
+
+      // set result dialog
+
+      if (errorChords) 
+      {
+         console.log("finished with error");
+         msgMoreNotes.visible = true;
+      } 
+      else
+      {
+         console.log("finished");
+         Qt.quit();
+      }
+   }
+  
+   
+   
+   
+   
+   
+   
+   
+   
+   // ---- check chords ----
 
    function v_to_s(vo)
    {
@@ -496,7 +1058,7 @@ MuseScore
    // class note_t
    function note_t(ppi, voi)
    {
-      this.ppitch = ppi;    // original pitch
+      this.pitch = ppi;    // original pitch
       this.bpitch = ppi%12; // pitch in 0-11 range
       this.voice  = voi;    // voice SOP, ALT or TEN
       this.step   = 0;      // 1, 3 or 5
@@ -504,7 +1066,7 @@ MuseScore
       console.log("new note_t " + ppi + " " + v_to_s(voi));
 
       this.show = function(base) {
-         console.log("      note_t v" + v_to_s(this.voice) + " " + this.ppitch + " " + pitch_to_s(this.bpitch) + " base " + (this.ppitch-base) +
+         console.log("      note_t v" + v_to_s(this.voice) + " " + this.pitch + " " + pitch_to_s(this.bpitch) + " base " + (this.pitch-base) +
          " step " + this.step);
       }
    }
@@ -513,22 +1075,22 @@ MuseScore
    function triad_t(co)
    {
       this.notes = [];
-      this.notes[0] = new note_t(co.notes[0].ppitch, sop_e);
-      this.notes[1] = new note_t(co.notes[1].ppitch, alt_e);
-      this.notes[2] = new note_t(co.notes[2].ppitch, ten_e);
+      this.notes[0] = new note_t(co.notes[0].pitch, sop_e);
+      this.notes[1] = new note_t(co.notes[1].pitch, alt_e);
+      this.notes[2] = new note_t(co.notes[2].pitch, ten_e);
 
       this.show = function() {
          console.log("   triad_t");
-         this.notes[0].show(this.notes[2].ppitch);
-         this.notes[1].show(this.notes[2].ppitch);
-         this.notes[2].show(this.notes[2].ppitch);
+         this.notes[0].show(this.notes[2].pitch);
+         this.notes[1].show(this.notes[2].pitch);
+         this.notes[2].show(this.notes[2].pitch);
       }
 
       this.rotate = function() {
-         this.notes[2].ppitch += 12;
-         while (this.notes[2].ppitch < this.notes[0].ppitch)
+         this.notes[2].pitch += 12;
+         while (this.notes[2].pitch < this.notes[0].pitch)
          {
-            this.notes[2].ppitch += 12;
+            this.notes[2].pitch += 12;
          }
          var tmp = this.notes[2];
          this.notes[2] = this.notes[1];
@@ -536,13 +1098,13 @@ MuseScore
          this.notes[0] = tmp;
       }
 
-      this.sort_on_ppitch = function() {
-         console.log("sort_on_ppitch");
+      this.sort_on_pitch = function() {
+         console.log("sort_on_pitch");
          var cont = true;
          while (cont)
          {
             cont = false;
-            if (this.notes[0].ppitch < this.notes[1].ppitch)
+            if (this.notes[0].pitch < this.notes[1].pitch)
             {
                var tmp = this.notes[0];
                this.notes[0] = this.notes[1];
@@ -550,7 +1112,7 @@ MuseScore
                cont = true;
                console.log("switch 0-1");
             }
-            if (this.notes[1].ppitch < this.notes[2].ppitch)
+            if (this.notes[1].pitch < this.notes[2].pitch)
             {
                var tmp = this.notes[1];
                this.notes[1] = this.notes[2];
@@ -562,21 +1124,21 @@ MuseScore
       }
 
       this.normalize = function() {
-         while (this.notes[1].ppitch-12 > this.notes[2].ppitch)
+         while (this.notes[1].pitch-12 > this.notes[2].pitch)
          {
-            this.notes[1].ppitch -= 12;
+            this.notes[1].pitch -= 12;
          }
-         while (this.notes[0].ppitch-12 > this.notes[2].ppitch)
+         while (this.notes[0].pitch-12 > this.notes[2].pitch)
          {
-            this.notes[0].ppitch -= 12;
+            this.notes[0].pitch -= 12;
          }
-         this.sort_on_ppitch();
+         this.sort_on_pitch();
       }
 
       this.is_major_triad = function() {
-         var hig = this.notes[0].ppitch;
-         var mid = this.notes[1].ppitch;
-         var low = this.notes[2].ppitch;
+         var hig = this.notes[0].pitch;
+         var mid = this.notes[1].pitch;
+         var low = this.notes[2].pitch;
 
          if (hig-low == 7  && mid-low == 4)
          {
@@ -591,7 +1153,68 @@ MuseScore
          }
          else
          {
+            console.log("is not major triad");
             return false;
+         }
+      }
+
+
+      this.is_minor_triad = function() {
+         var hig = this.notes[0].pitch;
+         var mid = this.notes[1].pitch;
+         var low = this.notes[2].pitch;
+
+         console.log("is_minor_triad");
+         
+         if (hig-low == 7  && mid-low == 3)
+         {
+            this.notes[0].step = 5;
+            this.notes[1].step = 3;
+            this.notes[2].step = 1;
+            console.log("is minor triad");
+
+            this.is_wide();
+
+            return true;
+         }
+         else
+         {
+            console.log("is not minor triad");
+            return false;
+         }
+      }
+
+
+      //   degree |   minor scale  | major scale
+      //   -------|----------------|-------------
+      //      1   |   min triad    | maj triad
+      //      4   |   min triad    | maj triad
+      //      5   |   maj triad    | maj triad
+      //      6   |   maj triad    | min triad
+      this.is_majmin_triad = function(isminor, degree) {
+         if (isminor)
+         {
+            console.log("is minor key");
+            if (degree == 5 && degree == 6)
+            {
+               return this.is_major_triad();
+            }
+            else
+            {
+               return this.is_minor_triad();
+            }
+         }
+         else
+         {
+            console.log("is major key, degree " + degree);
+            if (degree == 6)
+            {
+               return this.is_minor_triad();
+            }
+            else
+            {
+               return this.is_major_triad();
+            }
          }
       }
 
@@ -627,8 +1250,10 @@ MuseScore
    // class chord_t
    function chord_t()
    {
-      this.notes = [];
-      this.wide  = false;
+      this.notes  = [];
+      this.wide   = false;
+      this.degree = 0; // degree 1, 4, 5 or 6
+      this.tick   = 0;
 
       this.add = function(not) {
          this.notes.push(not);
@@ -639,24 +1264,24 @@ MuseScore
 
          for (var i=0; i<this.notes.length; i++)
          {
-             console.log("      note " + this.notes[i].ppitch);
+             console.log("      note " + this.notes[i].pitch);
          }
       }
 
-      // chech wether every note is higher then the next
-      // of differently said, no crssing between voices
+      // check wether every note is higher then the next
+      // of differently said, no crossing between voices
       this.no_crossing_voice = function()
       {
-         console.log("no_crossing_voice " + 
-            this.notes[0].ppitch + " " +
-            this.notes[1].ppitch + " " +
-            this.notes[2].ppitch + " " +
-            this.notes[3].ppitch);
+         //console.log("no_crossing_voice " + 
+         //   this.notes[0].pitch + " " +
+         //   this.notes[1].pitch + " " +
+         //   this.notes[2].pitch + " " +
+         //   this.notes[3].pitch);
 
          var noc =
-            this.notes[0].ppitch > this.notes[1].ppitch &&
-            this.notes[1].ppitch > this.notes[2].ppitch &&
-            this.notes[2].ppitch > this.notes[3].ppitch;
+            this.notes[0].pitch > this.notes[1].pitch &&
+            this.notes[1].pitch > this.notes[2].pitch &&
+            this.notes[2].pitch > this.notes[3].pitch;
 
          return noc;
       }
@@ -718,7 +1343,7 @@ MuseScore
                      for (var j = 0; j < notes.length; j++)
                      {
                         console.log("         note " + elementtype_to_s(notes[j].type) 
-                       + " " + notes[j].ppitch + " " + pitch_to_s(notes[j].ppitch)
+                       + " " + notes[j].pitch + " " + pitch_to_s(notes[j].pitch)
                        + " els " + notes[j].elements.length);
 
                         for (var k=0; k<notes[j].elements.length; k++)
@@ -733,7 +1358,7 @@ MuseScore
                }
                else
                {
-                  console.log("      elementt " + el);
+                  //console.log("      elementt null " + el);
                }
             }
 
@@ -753,22 +1378,30 @@ MuseScore
       }
       
       // Calculates the number of voices
+      //
+      // This function loops through all the segments.
+      // Each segment starts at a fixed tick and can have max. 4 voices
+      // per stave. Each voice is represented by a chord. Each chord can
+      // several parallel notes of the same length.  
       this.get_nr_voices = function() {
          console.log('get_nr_voices');
 
          console.log('curScore.nstaves: ' + curScore.nstaves);
         
+         // Each voice (or chords, max 4 per stave) starts with 0 notes 
          var nvoices = [];
          for (var i=0; i<4*this.nst; i++)
          {
             nvoices[i] = 0;
          }
 
+         // for all segments
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
+            // for all voices
             for (var i=0; i<4*this.nst; i++)
             {
                var el = segm.elementAt(i);
@@ -779,19 +1412,21 @@ MuseScore
                      var notes = el.notes;
                      for (var j = 0; j < notes.length; j++)
                      {
-                        console.log("       " + i + "  note " + elementtype_to_s(notes[j].type) 
-                       + " " + notes[j].ppitch + " " + pitch_to_s(notes[j].ppitch));
+                        //console.log("       voice " + i + "  note " + j + " " + elementtype_to_s(notes[j].type) 
+                        //   + " " + notes[j].pitch + " " + pitch_to_s(notes[j].pitch));
                      }
-                     //if (notes.length > nvoices[i])
-                     //{
-                     //}
-                     nvoices[i] = 1;
+                     if (notes.length > nvoices[i])
+                     {
+                        nvoices[i] = notes.length;
+                     }                     
+                     //nvoices[i] = 1;
                   }
                }
             }
             segm = segm.next;
          }
          
+         // count all the available voices
          var nv = 0
          for (var i=0; i<4*this.nst; i++)
          {
@@ -801,14 +1436,15 @@ MuseScore
       }
 
 
-      // Checks whether each chord has a single note
+      // Checks whether each chord has a single note.
+      // Only chords with 1 note are allowed.
       this.check_single_note_chord = function() {
          console.log('check_single_note_chord');
 
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -848,7 +1484,7 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   p1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   p1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -868,7 +1504,7 @@ MuseScore
          segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   p2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   p2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -902,7 +1538,7 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   s1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   s1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -923,14 +1559,14 @@ MuseScore
          segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   s2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
-            console.log("      segmenttype " + segm.segmentType);
+            //console.log("   s2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("      segmenttype " + segm.segmentType);
 
             if (segm.segmentType == Segment.ChordRest)  // 128 is probably Segment.ChordRest
             {
                for (var i=0; i<4*this.nst; i++)
                {
-                  console.log("      " + i + " hasvoice " + hasvoice[i]); 
+                  //console.log("      " + i + " hasvoice " + hasvoice[i]); 
                   var el = segm.elementAt(i);
                   if (el == null && hasvoice[i])
                   {
@@ -940,7 +1576,7 @@ MuseScore
             }
             else
             {
-               console.log("      no chord in this segment");
+               //console.log("      no chord in this segment");
             }
             segm = segm.next;
          }
@@ -957,11 +1593,12 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   m segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   m segment " + segm.tick + " " + elementtype_to_s(segm.type));
 
             if (segm.segmentType == Segment.ChordRest)  // 128 is probably Segment.ChordRest
             {
                var co = new chord_t();
+               co.tick = segm.tick;
                this.chords.push(co);
 
                for (var i=0; i<4*this.nst; i++)
@@ -971,9 +1608,9 @@ MuseScore
                   {
                      if (el.type == Element.CHORD)
                      {
-                        console.log("      add note");   
-                        var notes = el.notes;
-                        co.add(notes[0]);
+                        //console.log("      add note " + el.notes[0].pitch);   
+                        var nots = el.notes;
+                        co.add(nots[0]);
                      }
                   }
                }
@@ -988,7 +1625,7 @@ MuseScore
 
          for (var i=0; i<this.chords.length; i++)
          {
-            console.log("   noc " + i);
+            //console.log("   noc " + i);
             if (!this.chords[i].no_crossing_voice())
             {
                return false;
@@ -1031,7 +1668,7 @@ MuseScore
          console.log("key " + keynote + " " + pitch_to_s(keynote));
 
          var ncho = this.chords.length;
-         var lastbassnote = this.chords[ncho-1].notes[3].ppitch;
+         var lastbassnote = this.chords[ncho-1].notes[3].pitch;
          console.log("last bass note " + lastbassnote + " " + pitch_to_s(lastbassnote));
 
          var minorkeynote = keynote - 3; // minor third lower
@@ -1063,18 +1700,47 @@ MuseScore
 
          var b4 = (b1 + 5) % 12; 
          var b5 = (b1 + 7) % 12;
+         var b6 = (b1 + 9) % 12;
 
          console.log("b1 " + b1 + " " + pitch_to_s(b1));
          console.log("b4 " + b4 + " " + pitch_to_s(b4));
          console.log("b5 " + b5 + " " + pitch_to_s(b5));
+         console.log("b6 " + b6 + " " + pitch_to_s(b6));
 
          for (var i=0; i<this.chords.length; i++)
          {
-            var bassnote = this.chords[i].notes[3].ppitch % 12;
+            var bassnote = this.chords[i].notes[3].pitch % 12;
             console.log("bassnote " + bassnote + " " + pitch_to_s(bassnote));
-            if (bassnote != b1 && bassnote != b4 && bassnote != b5)
+            
+            if (bassnote == b1)
             {
-               console.log("wrong bass note, not I, IV or V " + b5 + " " + pitch_to_s(b5));
+               this.chords[i].degree = 1;
+            }
+            else
+            if (bassnote == b4)
+            {
+               this.chords[i].degree = 4;
+            }
+            else
+            if (bassnote == b5)
+            {
+               this.chords[i].degree = 5;
+            }
+            else
+            if (bassnote == b6)
+            {
+               this.chords[i].degree = 6;
+            }
+            
+            
+            
+            if (bassnote != b1 && bassnote != b4 && bassnote != b5 && bassnote != b6)
+            {
+               console.log("wrong bass note, not I, IV, V or VI " + b5 + " " + pitch_to_s(b5));
+
+               markColorNote(this.chords[i].notes[3], colorError);
+               markTextTick("wrong bass note", this.chords[i].tick);
+
                return false;
             }
          }
@@ -1093,7 +1759,7 @@ MuseScore
             var set = {};
             for (var j=0; j<4; j++)
             {
-               var no = this.chords[i].notes[j].ppitch % 12;
+               var no = this.chords[i].notes[j].pitch % 12;
                console.log("      no " + no);
                set[no] = true;
             }
@@ -1113,10 +1779,10 @@ MuseScore
          for (var i=0; i<this.chords.length; i++)
          {
             console.log("   chord bis");
-            var sop = this.chords[i].notes[0].ppitch % 12;
-            var alt = this.chords[i].notes[1].ppitch % 12;
-            var ten = this.chords[i].notes[2].ppitch % 12;
-            var bas = this.chords[i].notes[3].ppitch % 12;
+            var sop = this.chords[i].notes[0].pitch % 12;
+            var alt = this.chords[i].notes[1].pitch % 12;
+            var ten = this.chords[i].notes[2].pitch % 12;
+            var bas = this.chords[i].notes[3].pitch % 12;
             console.log("      " + sop + " " + alt + " " + ten + " " + bas);
 
             if (!(sop == bas || alt == bas || ten == bas))
@@ -1139,7 +1805,7 @@ MuseScore
             triad.normalize();
             triad.show();
 
-            var matriad = triad.is_major_triad();
+            var matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
 
             if (!matriad)
             {
@@ -1151,7 +1817,7 @@ MuseScore
                //triad.normalize();
                //triad.show();
 
-               matriad = triad.is_major_triad();
+               matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
                if (!matriad)
                {
                   console.log("after rotate2");
@@ -1162,10 +1828,14 @@ MuseScore
                   //triad.normalize();
                   //triad.show();
 
-                  matriad = triad.is_major_triad();
+                  matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
 
                   if (!matriad)
                   {
+                     console.log("not correct triad");
+                     markColorNote(this.chords[i].notes[0], colorError);
+                     //markTextTick("is not a correct triad", this.chords[i].tick);
+
                      return false;
                   }
                }
@@ -1197,35 +1867,68 @@ MuseScore
 
       var sco = new score_t();
       //sco.show();
+      // only for test
       sco.show_score();
 
+      // Test rule 1
       var nv = sco.get_nr_voices();
       console.log("nv " + nv);
 
       if (nv == 4)
       {
+         // continuing rule 1
          var si = sco.check_single_note_chord();
          console.log("si " + si);
 
+         if (!si)
+         {
+            msgError.text = "Having more than 1 note in a voice is not allowed";
+            msgError.open();
+
+            Qt.quit();
+         }
+         
+         // rule 2
          var nor = sco.check_no_rests();
          console.log("nor " + nor);
 
+         if (!nor)
+         {
+            msgError.text = "Rests are not allowed";
+            msgError.open();
+
+            Qt.quit();
+         }
+
+         // rule 3
          var sad = sco.check_same_duration();
          console.log("sad " + sad);
+
+         if (!sad)
+         {
+            msgError.text = "All notes must have the same duration";
+            msgError.open();
+
+            Qt.quit();
+         }
 
          if (si && nor && sad)
          {
             sco.make_chords();
             sco.show_notes();
 
+            // rule 4
             var noc = sco.no_crossing_voices();
             console.log("no crossing voices " + noc);
 
             if (!noc)
             {
+               msgError.text = "Voices cannot cross";
+               msgError.open();
                Qt.quit();
             }
 
+            // rule 5
             var prim = sco.bass_primary_chords();
             console.log("prim " + prim);
 
@@ -1234,21 +1937,27 @@ MuseScore
                console.log("use only primary chords");
                Qt.quit();
             }
-
-            var triadok = sco.only_triads();
-            console.log("triadok " + triadok);
-            if (!triadok)
+            else
             {
-               console.log("each chord should have exact 3 different notes");
-               Qt.quit();
+               console.log("start triadok");
+               var triadok = sco.only_triads();
+               console.log("triadok " + triadok);
+               if (!triadok)
+               {
+                  console.log("each chord should have exact 3 different notes");
+                  Qt.quit();
+               }
+               sco.show_notes();
             }
-            sco.show_notes();
          }
       }
       else
       {
          console.log("the score should have 4 voices");
+         msgError.text = "Rule 1, the score should have 4 voices";
+         msgError.open();
       }
+      //msgNoErrors.open();
 
       Qt.quit();
    } // end onRun

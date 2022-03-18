@@ -1,11 +1,53 @@
 # `check-harmony-rules`
 
-A plugin for MuseScore v2 to check the correct use of primary chords.
+A plugin for MuseScore v3 to check the correct use of primary chords
+and their connections in a 4 voice score.
 
-If you discover greater discrepancies or problems, please let me know.
+# Rules
+## Rule 1
 
-Warning: Please safe your score before using this plugin.
+A score must have 4 voices. Each voice has a single note.
 
+## Rule 2
+
+There are no rests in any voice.
+
+## Rule 3
+
+At any point in time the notes in all the simultaneous voices must have the same length.
+In other words, each voice sings simultaneously a note with the same length.
+The length may vary at different points of time.
+
+## Rule 4
+
+Voices cannot cross.
+
+## Rule 5
+
+The bass voice sings the root of the chord.
+Only the chords I, IV, V and VI are allowed.
+
+## Rule 6
+
+Each chord is a triad like *c e g*.
+So each chord has 3 different notes.
+The root is always doubled.
+
+This table describes the use of major and minor keys
+
+ degree |   minor scale  | major scale
+--------|----------------|-------------
+    1   |   min triad    | maj triad
+    4   |   min triad    | maj triad
+    5   |   maj triad    | maj triad
+    6   |   maj triad    | min triad
+
+## Rule 7
+
+All chords except the chord in degree VI must be written either in open of closed distance.
+
+
+# Links
 
 API:
 
@@ -22,7 +64,7 @@ Javascript and prototype
 # MuseScore internal score representation
 
 
-This document gives an overview of how a score is represented in MuseScore. 
+This section gives an overview of how a score is represented in MuseScore. 
 If you find it long on generalities and short on details, consider that a good thing, as details tend to change rapidly. 
 So by keeping this fairly general, it is less likely to be out of date. This description was originally created shortly before the release of MuseScore 2.0.
 
