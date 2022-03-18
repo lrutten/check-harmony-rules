@@ -25,7 +25,7 @@ Voices cannot cross.
 ## Rule 5
 
 The bass voice sings the root of the chord.
-Only the chords I, IV, V and VI are allowed.
+Only the chords I, II, IV, V and VI are allowed.
 
 ## Rule 6
 
@@ -35,12 +35,13 @@ The root is always doubled.
 
 This table describes the use of major and minor keys
 
- degree |   minor scale  | major scale
---------|----------------|-------------
-    1   |   min triad    | maj triad
-    4   |   min triad    | maj triad
-    5   |   maj triad    | maj triad
-    6   |   maj triad    | min triad
+ degree |   minor scale   | major scale
+--------|-----------------|-------------
+    1   |   min triad     | maj triad
+    2   |   min triad,dim | min triad
+    4   |   min triad     | maj triad
+    5   |   maj triad     | maj triad
+    6   |   maj triad     | min triad
 
 ## Rule 7
 

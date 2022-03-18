@@ -1698,11 +1698,19 @@ MuseScore
             Qt.quit();
          }
 
+         var b2 = (b1 + 2) % 12; 
          var b4 = (b1 + 5) % 12; 
          var b5 = (b1 + 7) % 12;
          var b6 = (b1 + 9) % 12;
+         if (this.minor)
+         {
+            // in a minor key degree 6 is only 8
+            // half notes higher than the key note
+            b6 = (b1 + 8) % 12;
+         }
 
          console.log("b1 " + b1 + " " + pitch_to_s(b1));
+         console.log("b2 " + b2 + " " + pitch_to_s(b2));
          console.log("b4 " + b4 + " " + pitch_to_s(b4));
          console.log("b5 " + b5 + " " + pitch_to_s(b5));
          console.log("b6 " + b6 + " " + pitch_to_s(b6));
@@ -1731,12 +1739,17 @@ MuseScore
             {
                this.chords[i].degree = 6;
             }
-            
-            
-            
-            if (bassnote != b1 && bassnote != b4 && bassnote != b5 && bassnote != b6)
+            else
+            if (bassnote == b2)
             {
-               console.log("wrong bass note, not I, IV, V or VI " + b5 + " " + pitch_to_s(b5));
+               this.chords[i].degree = 2;
+            }
+            
+            
+            
+            if (bassnote != b1 && bassnote != b4 && bassnote != b5 && bassnote != b6 && bassnote != b2)
+            {
+               console.log("wrong bass note, not I, IV, V, VI or II" + b2 + " " + pitch_to_s(b2));
 
                markColorNote(this.chords[i].notes[3], colorError);
                markTextTick("wrong bass note", this.chords[i].tick);
