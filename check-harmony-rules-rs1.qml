@@ -173,6 +173,26 @@ MuseScore
       cursor.add(myText);
    }      
 
+   function markTextTickLow(msg, tick) 
+   {
+      console.log("text " + msg);
+      
+      var txt = newElement(Element.STAFF_TEXT);
+      txt.text = msg;
+      //txt.pos.x = 0;
+      txt.offsetY = 5;
+      txt.placement = Placement.BELOW;
+      
+      var cursor = curScore.newCursor();
+      cursor.rewind(0);
+      cursor.track = 5;  // use track 5
+      while (cursor.tick < tick) 
+      {
+         cursor.next();
+      }
+      cursor.add(txt);
+   }      
+
    function isAugmentedInt(note1, note2) 
    {
       var dtpc = note2.tpc - note1.tpc;
@@ -1185,19 +1205,52 @@ MuseScore
       }
 
 
-      //   degree |   minor scale  | major scale
-      //   -------|----------------|-------------
-      //      1   |   min triad    | maj triad
-      //      4   |   min triad    | maj triad
-      //      5   |   maj triad    | maj triad
-      //      6   |   maj triad    | min triad
+      this.is_minor_dim_triad = function() {
+         var hig = this.notes[0].pitch;
+         var mid = this.notes[1].pitch;
+         var low = this.notes[2].pitch;
+
+         console.log("is_minor_dim_triad");
+         
+         if (hig-low == 6  && mid-low == 3)
+         {
+            this.notes[0].step = 5;
+            this.notes[1].step = 3;
+            this.notes[2].step = 1;
+            console.log("is minor dim triad");
+
+            this.is_wide();
+
+            return true;
+         }
+         else
+         {
+            console.log("is not minor dim triad");
+            return false;
+         }
+      }
+
+
+      //   degree |   minor scale    | major scale
+      //   -------|------------------|-------------
+      //      1   |   min triad      | maj triad
+      //      2   |   min triad, dim | maj triad
+      //      4   |   min triad      | maj triad
+      //      5   |   maj triad      | maj triad
+      //      6   |   maj triad      | min triad
       this.is_majmin_triad = function(isminor, degree) {
+         console.log("degree " + degree);
          if (isminor)
          {
             console.log("is minor key");
-            if (degree == 5 && degree == 6)
+            if (degree == 5 || degree == 6)
             {
                return this.is_major_triad();
+            }
+            else
+            if (degree == 2)
+            {
+               return this.is_minor_dim_triad();
             }
             else
             {
@@ -1865,6 +1918,33 @@ MuseScore
 
          return true;
       }
+      
+      this.mark_degrees = function() {
+         console.log("mark_degrees "+ this.chords.length);
+         for (var i=0; i<this.chords.length; i++)
+         {
+            console.log("   i "+ i + " tick " + this.chords[i].tick);
+            switch (this.chords[i].degree)
+            {
+               case 1:
+                  markTextTickLow("I", this.chords[i].tick);
+                  break;
+               case 2:
+                  markTextTickLow("II", this.chords[i].tick);
+                  break;
+               case 4:
+                  markTextTickLow("IV", this.chords[i].tick);
+                  break;
+               case 5:
+                  markTextTickLow("V", this.chords[i].tick);
+                  break;
+               case 6:
+                  markTextTickLow("VI", this.chords[i].tick);
+                  break;
+            }                  
+         }
+      }
+
 
    } // class score_t
 
@@ -1960,7 +2040,9 @@ MuseScore
                   console.log("each chord should have exact 3 different notes");
                   Qt.quit();
                }
-               sco.show_notes();
+               //sco.show_notes();
+               //markTextTickLow("I", 0)
+               sco.mark_degrees();
             }
          }
       }
