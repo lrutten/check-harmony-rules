@@ -1078,7 +1078,7 @@ MuseScore
    // class note_t
    function note_t(ppi, voi)
    {
-      this.pitch = ppi;    // original pitch
+      this.pitch  = ppi;    // original pitch
       this.bpitch = ppi%12; // pitch in 0-11 range
       this.voice  = voi;    // voice SOP, ALT or TEN
       this.step   = 0;      // 1, 3 or 5
@@ -1098,12 +1098,14 @@ MuseScore
       this.notes[0] = new note_t(co.notes[0].pitch, sop_e);
       this.notes[1] = new note_t(co.notes[1].pitch, alt_e);
       this.notes[2] = new note_t(co.notes[2].pitch, ten_e);
+      this.notes[3] = new note_t(co.notes[3].pitch, bas_e);
 
       this.show = function() {
          console.log("   triad_t");
          this.notes[0].show(this.notes[2].pitch);
          this.notes[1].show(this.notes[2].pitch);
          this.notes[2].show(this.notes[2].pitch);
+         this.notes[3].show(this.notes[3].pitch);
       }
 
       this.rotate = function() {
@@ -1143,11 +1145,15 @@ MuseScore
          }
       }
 
+      // normalize the sop, alt and ten voices
       this.normalize = function() {
+         // lower the middle while staying above the lower 
          while (this.notes[1].pitch-12 > this.notes[2].pitch)
          {
             this.notes[1].pitch -= 12;
          }
+         
+         // lower the higher while staying above the lower
          while (this.notes[0].pitch-12 > this.notes[2].pitch)
          {
             this.notes[0].pitch -= 12;
@@ -1230,6 +1236,34 @@ MuseScore
          }
       }
 
+      // In the case of a minor degree 6 the 3rd can be doubled.
+      this.is_minor_double3_triad = function() {
+         var hig = this.notes[0].pitch;
+         var mid = this.notes[1].pitch;
+         var low = this.notes[2].pitch;
+         var bas = this.notes[3].pitch
+
+         console.log("is_minor_double3_triad");
+         
+         if (hig-low == 7  && mid-low == 0 && low-bas == 3)
+         {
+            this.notes[0].step = 5;
+            this.notes[1].step = 3;
+            this.notes[2].step = 3;
+            console.log("is minor double3 triad");
+
+            this.is_wide();
+
+            return true;
+         }
+         else
+         {
+            console.log("is not minor double3 triad");
+            return false;
+         }
+      }
+
+
 
       //   degree |   minor scale    | major scale
       //   -------|------------------|-------------
@@ -1262,7 +1296,7 @@ MuseScore
             console.log("is major key, degree " + degree);
             if (degree == 6)
             {
-               return this.is_minor_triad();
+               return this.is_minor_triad() || this.is_minor_double3_triad();
             }
             else
             {
@@ -1687,25 +1721,34 @@ MuseScore
          return true;
       }   
 
-      // check bass voice has only primary chords
+      // Check bass voice has only primary chords.
+      //
+      // These are the steps:
+      //
+      //    Use the key signature and the last bass note
+      //    to determine the key: major or minor.
+      //
+      //    Determine all the possible bass notes:
+      //       b1, b2, b4, b5 and b6
+      //    These notes are %12 normalized.
+      //
+      //    Each bass note must be one of these notes
+      //
       this.bass_primary_chords = function() {
          console.log("bass_primary_chords");
 
          var cursor = curScore.newCursor();
-         //cursor.rewind(0); // beginning of score
-         //cursor.voice    = 0;
-         //cursor.staffIdx = 0; // 1st staff;
  
          var keysig = cursor.keySignature;
          console.log("keysig: " + keysig);
 
          var keynote = 0;
          var n       = 0;
-         var step    = 0; // quart or fifth up
+         var step    = 0; // fourth or fifth up
          if (keysig < 0)
          {
             n    = -keysig;
-            step = 5;  // quart
+            step = 5;  // fourth
          }
          else
          {
@@ -1751,23 +1794,30 @@ MuseScore
             Qt.quit();
          }
 
+         // b1 now contains the keynote, minor of major.
+         // this.minor true means minor key.
+         
          var b2 = (b1 + 2) % 12; 
          var b4 = (b1 + 5) % 12; 
          var b5 = (b1 + 7) % 12;
          var b6 = (b1 + 9) % 12;
          if (this.minor)
          {
-            // in a minor key degree 6 is only 8
-            // half notes higher than the key note
+            // In a minor key degree 6 is only 8
+            // half notes higher than the key note.
             b6 = (b1 + 8) % 12;
          }
 
+         // b2, b4, b5 and b6 contain the notes
+         // for all the possible degrees.
+         
          console.log("b1 " + b1 + " " + pitch_to_s(b1));
          console.log("b2 " + b2 + " " + pitch_to_s(b2));
          console.log("b4 " + b4 + " " + pitch_to_s(b4));
          console.log("b5 " + b5 + " " + pitch_to_s(b5));
          console.log("b6 " + b6 + " " + pitch_to_s(b6));
 
+         
          for (var i=0; i<this.chords.length; i++)
          {
             var bassnote = this.chords[i].notes[3].pitch % 12;
@@ -1813,8 +1863,8 @@ MuseScore
          return true;
       }
 
-      // only triads consisting of 2 ground notes, one third and one fifth
-      // are allowed
+      // Only triads consisting of 2 ground notes, one third and one fifth
+      // are allowed.
       this.only_triads = function() {
          console.log("only_triads");
 
@@ -1927,19 +1977,19 @@ MuseScore
             switch (this.chords[i].degree)
             {
                case 1:
-                  markTextTickLow("I", this.chords[i].tick);
+                  markTextTickLow("I\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
                   break;
                case 2:
-                  markTextTickLow("II", this.chords[i].tick);
+                  markTextTickLow("II\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
                   break;
                case 4:
-                  markTextTickLow("IV", this.chords[i].tick);
+                  markTextTickLow("IV\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
                   break;
                case 5:
-                  markTextTickLow("V", this.chords[i].tick);
+                  markTextTickLow("V\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
                   break;
                case 6:
-                  markTextTickLow("VI", this.chords[i].tick);
+                  markTextTickLow("VI\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
                   break;
             }                  
          }
