@@ -1,7 +1,8 @@
 //=============================================================================
 //  MuseScore - Chord Identifier Plugin (Chgd. by. Ziya Mete Demircan)
 //
-//  Copyright (C) 2016 Emmanuel Roussel - https://github.com/rousselmanu/msc_plugins
+//  Copyright (C) 2016 Emmanuel Roussel -
+//            https://github.com/rousselmanu/msc_plugins
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License version 2
@@ -11,9 +12,12 @@
 //  Documentation: https://github.com/rousselmanu/msc_plugins
 //  Support: https://github.com/rousselmanu/msc_plugins/issues
 //  
-//  I started this plugin as an improvement of the "Find Harmonies" plugin by Andresn 
-//      (https://github.com/andresn/standard-notation-experiments/tree/master/MuseScore/plugins/findharmonies)
-//      itself being an enhanced version of "findharmony" by Merte (http://musescore.org/en/project/findharmony)
+//  I started this plugin as an improvement of the "Find Harmonies" plugin
+//  by Andresn
+//  https://github.com/andresn/standard-notation-experiments/ \
+//       tree/master/MuseScore/plugins/findharmonies)
+//  itself being an enhanced version of "findharmony" by Merte
+//      http://musescore.org/en/project/findharmony
 //  I took some lines of code or got inspiration from:
 //  - Berteh (https://github.com/berteh/musescore-chordsToNotes/)
 //  - Jon Ensminger (AddNoteNameNoteHeads v. 1.2 plugin)
@@ -401,7 +405,8 @@ MuseScore
             endTick = curScore.lastSegment.tick + 1;
          }
          cursor.rewind(1);
-         console.log("Selection is: Staves("+startStaff+"-"+endStaff+") Ticks("+cursor.tick+"-"+endTick+")");
+         console.log("Selection is: Staves(" + startStaff + "-" + endStaff +
+            ") Ticks(" + cursor.tick + "-" + endTick +")");
       }   
 
       // initialize data structure
@@ -568,7 +573,8 @@ MuseScore
                            {
                               foundParallels++;
                               console.log ("P5:"+cint+", "+pint);
-                              markText(prevNote[track],prevNote[i],"parallel 5th",
+                              markText(prevNote[track],prevNote[i],
+                                 "parallel 5th",
                                  colorFifth,track,prevTick[track]);
                               markColor(curNote[track],curNote[i],colorFifth);
                            } 
@@ -578,7 +584,8 @@ MuseScore
                               // hidden parallel (only when moving up)
                               foundParallels++;
                               console.log ("H5:"+cint+", "+pint);
-                              markText(prevNote[track],prevNote[i],"hidden 5th",
+                              markText(prevNote[track],prevNote[i],
+                                 "hidden 5th",
                                  colorFifth,track,prevTick[track]);
                               markColor(curNote[track],curNote[i],colorFifth);
                            }                        
@@ -590,8 +597,11 @@ MuseScore
                            if (cint == pint) 
                            {
                               foundParallels++;
-                              console.log ("P8:"+cint+", "+pint+"Tracks "+track+","+i+" Tick="+segment.tick);
-                              markText(prevNote[track],prevNote[i],"parallel 8th",
+                              console.log ("P8:" + cint + ", " + pint
+                              + "Tracks " + track + "," + i + " Tick="
+                              + segment.tick);
+                              markText(prevNote[track],prevNote[i],
+                                 "parallel 8th",
                                  colorOctave,track,prevTick[track]);
                               markColor(curNote[track],curNote[i],colorOctave);
                            } 
@@ -601,7 +611,8 @@ MuseScore
                               // hidden parallel (only when moving up)
                               foundParallels++;
                               console.log ("H8:"+cint+", "+pint);
-                              markText(prevNote[track],prevNote[i],"hidden 8th",
+                              markText(prevNote[track],prevNote[i],
+                                 "hidden 8th",
                                  colorOctave,track,prevTick[track]);
                               markColor(curNote[track],curNote[i],colorOctave);
                            }                        
@@ -1076,6 +1087,8 @@ MuseScore
 
 
    // class note_t
+   //
+   // This class represents a note.
    function note_t(ppi, voi)
    {
       this.pitch  = ppi;    // original pitch
@@ -1086,12 +1099,15 @@ MuseScore
       console.log("new note_t " + ppi + " " + v_to_s(voi));
 
       this.show = function(base) {
-         console.log("      note_t v" + v_to_s(this.voice) + " " + this.pitch + " " + pitch_to_s(this.bpitch) + " base " + (this.pitch-base) +
+         console.log("      note_t v" + v_to_s(this.voice) + " " + this.pitch
+         + " " + pitch_to_s(this.bpitch) + " base " + (this.pitch-base) +
          " step " + this.step);
       }
    }
 
    // class triad_t()
+   //
+   // This is a helper class which allows a range of checks on triads.
    function triad_t(co)
    {
       this.notes = [];
@@ -1100,6 +1116,7 @@ MuseScore
       this.notes[2] = new note_t(co.notes[2].pitch, ten_e);
       this.notes[3] = new note_t(co.notes[3].pitch, bas_e);
 
+      // Show the triad.
       this.show = function() {
          console.log("   triad_t");
          this.notes[0].show(this.notes[2].pitch);
@@ -1335,6 +1352,10 @@ MuseScore
    }
 
    // class chord_t
+   //
+   // This is the chord class for the internal model.
+   // It should contain 4 notes.
+   // A chord can be wide or close.
    function chord_t()
    {
       this.notes  = [];
@@ -1342,10 +1363,12 @@ MuseScore
       this.degree = 0; // degree 1, 4, 5 or 6
       this.tick   = 0;
 
+      // Add a note to the chord.
       this.add = function(not) {
          this.notes.push(not);
       }
 
+      // Show the chord.
       this.show = function() {
          console.log("   chord w " + this.wide);
 
@@ -1375,7 +1398,11 @@ MuseScore
    }
 
 
+
    // class score_t
+   //
+   // This class is the access point to the MuseScore model.
+   // It also builds its own internal model. 
    function score_t(n)
    {
       this.nr     = n;
@@ -1384,18 +1411,21 @@ MuseScore
       this.chords = [];
       this.minor  = false;
 
+      // Show only the number of staves
       this.show = function() {
          console.log("show");
          console.log('curScore.nstaves: ' + curScore.nstaves);
       }
    
 
+      // Show the MuseScore model
       this.show_score = function() {
          console.log('+++++++++++++++++++++');
          console.log('show_score');
 
          console.log('curScore.nstaves: ' + curScore.nstaves);
-         console.log('curScore.lastSegment.tick: ' + curScore.lastSegment.tick);
+         console.log('curScore.lastSegment.tick: '
+          + curScore.lastSegment.tick);
 
          var cursor = curScore.newCursor();
          cursor.rewind(0); // beginning of score
@@ -1409,19 +1439,22 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            console.log("   segment " + segm.tick + " "
+               + elementtype_to_s(segm.type));
             console.log("      segmenttype " + segm.segmentType);
-            console.log("                  " + segmenttype_to_s(segm.segmentType));
+            console.log("                  "
+               + segmenttype_to_s(segm.segmentType));
 
             for (var i=0; i<4*this.nst; i++)
             {
                var el = segm.elementAt(i);
                if (el != null)
                {
-                  console.log("      element " + el + " elementtype_to_s(el.type)");
+                  console.log("      element " + i + " " + el + " elementtype_to_s(el.type)");
                   if (el.duration)
                   {
-                     console.log("         duration " + el.duration.numerator + "/" + el.duration.denominator);
+                     console.log("         duration " + el.duration.numerator
+                        + "/" + el.duration.denominator);
                   }
 
                   if (el.type == Element.CHORD)
@@ -1429,13 +1462,16 @@ MuseScore
                      var notes = el.notes;
                      for (var j = 0; j < notes.length; j++)
                      {
-                        console.log("         note " + elementtype_to_s(notes[j].type) 
-                       + " " + notes[j].pitch + " " + pitch_to_s(notes[j].pitch)
+                        console.log("         note "
+                        + elementtype_to_s(notes[j].type)
+                       + " " + notes[j].pitch + " "
+                       + pitch_to_s(notes[j].pitch)
                        + " els " + notes[j].elements.length);
 
                         for (var k=0; k<notes[j].elements.length; k++)
                         {
-                           console.log("            element " + elementtype_to_s(notes[j].elements[k].type)); 
+                           console.log("            element "
+                           + elementtype_to_s(notes[j].elements[k].type));
                         }
                      }
                   }
@@ -1445,7 +1481,7 @@ MuseScore
                }
                else
                {
-                  //console.log("      elementt null " + el);
+                  //console.log("      element null " + el);
                }
             }
 
@@ -1455,6 +1491,7 @@ MuseScore
          console.log('=====================');
       }
 
+      // Show the internal model
       this.show_notes = function() {
          console.log("chords");
 
@@ -1486,7 +1523,8 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   segment " + segm.tick + " "
+            //   + elementtype_to_s(segm.type));
 
             // for all voices
             for (var i=0; i<4*this.nst; i++)
@@ -1499,8 +1537,10 @@ MuseScore
                      var notes = el.notes;
                      for (var j = 0; j < notes.length; j++)
                      {
-                        //console.log("       voice " + i + "  note " + j + " " + elementtype_to_s(notes[j].type) 
-                        //   + " " + notes[j].pitch + " " + pitch_to_s(notes[j].pitch));
+                        //console.log("       voice " + i + "  note " + j
+                        //   + " " + elementtype_to_s(notes[j].type)
+                        //   + " " + notes[j].pitch + " "
+                        //   + pitch_to_s(notes[j].pitch));
                      }
                      if (notes.length > nvoices[i])
                      {
@@ -1531,7 +1571,8 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   segment " + segm.tick + " "
+            // + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -1571,7 +1612,8 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   p1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   p1 segment " + segm.tick + " "
+            //   + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -1591,7 +1633,8 @@ MuseScore
          segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   p2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   p2 segment " + segm.tick
+            // + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -1625,7 +1668,8 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   s1 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   s1 segment " + segm.tick
+            //   + " " + elementtype_to_s(segm.type));
 
             for (var i=0; i<4*this.nst; i++)
             {
@@ -1646,11 +1690,12 @@ MuseScore
          segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   s2 segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   s2 segment " + segm.tick
+            // + " " + elementtype_to_s(segm.type));
             //console.log("      segmenttype " + segm.segmentType);
 
-            if (segm.segmentType == Segment.ChordRest)  // 128 is probably Segment.ChordRest
-            {
+            if (segm.segmentType == Segment.ChordRest)  // 128 is probably
+            {                                           // Segment.ChordRest
                for (var i=0; i<4*this.nst; i++)
                {
                   //console.log("      " + i + " hasvoice " + hasvoice[i]); 
@@ -1680,10 +1725,11 @@ MuseScore
          var segm = curScore.firstSegment();
          while (segm)
          {  //loop through the selection
-            //console.log("   m segment " + segm.tick + " " + elementtype_to_s(segm.type));
+            //console.log("   m segment " + segm.tick
+            // + " " + elementtype_to_s(segm.type));
 
-            if (segm.segmentType == Segment.ChordRest)  // 128 is probably Segment.ChordRest
-            {
+            if (segm.segmentType == Segment.ChordRest)
+            {                 // 128 is probably Segment.ChordRest
                var co = new chord_t();
                co.tick = segm.tick;
                this.chords.push(co);
@@ -1695,7 +1741,7 @@ MuseScore
                   {
                      if (el.type == Element.CHORD)
                      {
-                        //console.log("      add note " + el.notes[0].pitch);   
+                        //console.log("      add note " + el.notes[0].pitch);
                         var nots = el.notes;
                         co.add(nots[0]);
                      }
@@ -1765,14 +1811,16 @@ MuseScore
 
          var ncho = this.chords.length;
          var lastbassnote = this.chords[ncho-1].notes[3].pitch;
-         console.log("last bass note " + lastbassnote + " " + pitch_to_s(lastbassnote));
+         console.log("last bass note " + lastbassnote + " "
+            + pitch_to_s(lastbassnote));
 
          var minorkeynote = keynote - 3; // minor third lower
          if (minorkeynote < 0)
          {
             minorkeynote += 12;
          }
-         console.log("minor keynote " + minorkeynote + " " + pitch_to_s(minorkeynote));
+         console.log("minor keynote " + minorkeynote + " "
+            + pitch_to_s(minorkeynote));
 
          var b1 = 0;
          if (lastbassnote % 12 == minorkeynote)
@@ -1790,7 +1838,8 @@ MuseScore
          }
          else
          {
-            console.log("last note of bass is neither major nor minor key note");
+            console.log("last note of bass is neither major "
+               + "nor minor key note");
             Qt.quit();
          }
 
@@ -1850,9 +1899,11 @@ MuseScore
             
             
             
-            if (bassnote != b1 && bassnote != b4 && bassnote != b5 && bassnote != b6 && bassnote != b2)
+            if (bassnote != b1 && bassnote != b4 && bassnote != b5 &&
+                bassnote != b6 && bassnote != b2)
             {
-               console.log("wrong bass note, not I, IV, V, VI or II" + b2 + " " + pitch_to_s(b2));
+               console.log("wrong bass note, not I, IV, V, VI or II"
+                  + b2 + " " + pitch_to_s(b2));
 
                markColorNote(this.chords[i].notes[3], colorError);
                markTextTick("wrong bass note", this.chords[i].tick);
@@ -1884,7 +1935,8 @@ MuseScore
 
             if (len != 3)
             {
-               console.log("a chord must have exact 3 different notes, you have " + len);
+               console.log("a chord must have exact "
+               + "3 different notes, you have " + len);
                Qt.quit();
             }
          }
@@ -1921,7 +1973,8 @@ MuseScore
             triad.normalize();
             triad.show();
 
-            var matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
+            var matriad = triad.is_majmin_triad(this.minor,
+                                                this.chords[i].degree);
 
             if (!matriad)
             {
@@ -1933,7 +1986,8 @@ MuseScore
                //triad.normalize();
                //triad.show();
 
-               matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
+               matriad = triad.is_majmin_triad(this.minor,
+                                               this.chords[i].degree);
                if (!matriad)
                {
                   console.log("after rotate2");
@@ -1944,7 +1998,8 @@ MuseScore
                   //triad.normalize();
                   //triad.show();
 
-                  matriad = triad.is_majmin_triad(this.minor, this.chords[i].degree);
+                  matriad = triad.is_majmin_triad(this.minor,
+                                                  this.chords[i].degree);
 
                   if (!matriad)
                   {
@@ -1977,19 +2032,24 @@ MuseScore
             switch (this.chords[i].degree)
             {
                case 1:
-                  markTextTickLow("I\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
+                  markTextTickLow("I\n" + (this.chords[i].wide?"o":"c"),
+                                           this.chords[i].tick);
                   break;
                case 2:
-                  markTextTickLow("II\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
+                  markTextTickLow("II\n" + (this.chords[i].wide?"o":"c"),
+                                            this.chords[i].tick);
                   break;
                case 4:
-                  markTextTickLow("IV\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
+                  markTextTickLow("IV\n" + (this.chords[i].wide?"o":"c"),
+                                            this.chords[i].tick);
                   break;
                case 5:
-                  markTextTickLow("V\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
+                  markTextTickLow("V\n" + (this.chords[i].wide?"o":"c"),
+                                           this.chords[i].tick);
                   break;
                case 6:
-                  markTextTickLow("VI\n" + (this.chords[i].wide?"o":"c"), this.chords[i].tick);
+                  markTextTickLow("VI\n" + (this.chords[i].wide?"o":"c"),
+                                            this.chords[i].tick);
                   break;
             }                  
          }
@@ -2000,6 +2060,7 @@ MuseScore
 
 
 
+   // This is the entry point of the plugin
    onRun:
    {
       console.log('onRun');
@@ -2025,7 +2086,8 @@ MuseScore
 
          if (!si)
          {
-            msgError.text = "Having more than 1 note in a voice is not allowed";
+            msgError.text = "Having more than 1 note in a voice "
+               + "is not allowed";
             msgError.open();
 
             Qt.quit();
@@ -2087,7 +2149,8 @@ MuseScore
                console.log("triadok " + triadok);
                if (!triadok)
                {
-                  console.log("each chord should have exact 3 different notes");
+                  console.log("each chord should have exact "
+                     + " 3 different notes");
                   Qt.quit();
                }
                //sco.show_notes();
